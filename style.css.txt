@@ -1,0 +1,53 @@
+body {
+  margin: 0;
+  font-family: "Microsoft JhengHei";
+  background: #f5f6f8;
+}
+
+.container {
+  padding: 15px;
+  padding-bottom: 120px;
+}
+
+.card {
+  background: white;
+  padding: 15px;
+  border-radius: 15px;
+  margin-bottom: 15px;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  border: 1px solid #000;
+  text-align: center;
+  padding: 5px;
+}
+
+#logoPreview {
+  max-height: 80px;
+}
+
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: white;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+}
+
+.main-btn {
+  background: blue;
+  color: white;
+}

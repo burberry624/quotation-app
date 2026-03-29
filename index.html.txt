@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>報價單</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- Logo -->
+  <div class="card">
+    <input type="file" id="logoInput">
+    <img id="logoPreview">
+  </div>
+
+  <!-- 客戶資料 -->
+  <div class="card">
+    <input id="clientName" placeholder="客戶名稱">
+    <input id="phone" placeholder="電話">
+    <input id="address" placeholder="地址">
+    <input type="date" id="date">
+  </div>
+
+  <!-- 表格 -->
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>項次</th>
+          <th>品項</th>
+          <th>數量</th>
+          <th>總重</th>
+          <th>空重</th>
+          <th>淨重</th>
+          <th>單價</th>
+          <th>金額</th>
+        </tr>
+      </thead>
+      <tbody id="items"></tbody>
+    </table>
+    <button onclick="addRow()">＋新增一列</button>
+  </div>
+
+</div>
+
+<!-- 底部 -->
+<div class="bottom-bar">
+  <div>總計 $<span id="total">0</span></div>
+  <div>
+    <button onclick="downloadExcel()">Excel</button>
+    <button onclick="sendToGoogleSheet()">同步</button>
+    <button onclick="downloadPDF()" class="main-btn">PDF</button>
+  </div>
+</div>
+
+<!-- PDF -->
+<div id="pdf" style="display:none;"></div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
