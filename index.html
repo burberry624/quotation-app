@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>雞肉批發報價系統 (專業版)</title>
+    <title>雷達牧場 - 數位報價系統</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -13,278 +13,225 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap');
+        
+        :root {
+            /* 您可以根據 LOGO 顏色修改下方的色碼 */
+            --brand-color: #2D5A27; /* 預設為牧場深綠色 */
+            --brand-light: #F0F7EF;
+        }
+
         body { font-family: 'Noto Sans TC', sans-serif; }
         .serif { font-family: 'Noto Serif TC', serif; }
+        .bg-brand { background-color: var(--brand-color); }
+        .text-brand { color: var(--brand-color); }
+        .border-brand { border-color: var(--brand-color); }
+
         @media print {
             @page { size: A4; margin: 0; }
             body { background: white; -webkit-print-color-adjust: exact; }
             .no-print { display: none !important; }
             .print-container { width: 100%; margin: 0; padding: 15mm; box-shadow: none; }
             table, th, td { border-color: black !important; }
-            .page-break { page-break-inside: avoid; }
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-50 text-gray-800">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
 
         const IconPlus = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>;
-        const IconTrash = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>;
-        const IconPrinter = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>;
-        const IconDownload = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>;
-        const IconBack = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>;
-        const IconClose = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>;
+        const IconSync = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>;
 
         const App = () => {
             const [mode, setMode] = useState('edit');
-            const [logo, setLogo] = useState(localStorage.getItem("chicken_logo") || "");
+            const [isSyncing, setIsSyncing] = useState(false);
+            const [logo, setLogo] = useState(localStorage.getItem("radar_logo") || "");
             
             const [headerInfo, setHeaderInfo] = useState({
                 clientName: '', 
                 phone: '', 
                 date: new Date().toISOString().split('T')[0],
-                companyName: '您的商號名稱', 
-                companyPhone: '09XX-XXX-XXX',
-                footerNote: '1. 以上重量以實際過秤為準。\n2. 貨到請當面點交，簽收後概不負責。\n3. 請於約定日期內完成匯款。'
+                companyName: '雷達牧場', 
+                companyPhone: '請輸入電話',
+                footerNote: '1. 重量以實際過秤為準。\n2. 每日行情波動，報價僅限當日有效。'
             });
 
-            const [items, setItems] = useState(() => {
-                const saved = localStorage.getItem("chicken_data");
-                return saved ? JSON.parse(saved) : [
-                    { id: 1, name: '黑羽土雞', totalW: 0, tareW: 0, price: 0, note: '' }
-                ];
-            });
+            const [items, setItems] = useState([
+                { id: 1, name: '黑羽土雞', totalW: 0, tareW: 0, price: 0, note: '' }
+            ]);
 
-            // 自動儲存
-            useEffect(() => {
-                localStorage.setItem("chicken_data", JSON.stringify(items));
-            }, [items]);
-
+            const getNetW = (item) => Math.max(0, (Number(item.totalW) || 0) - (Number(item.tareW) || 0)).toFixed(2);
+            const getAmount = (item) => Math.round(getNetW(item) * (Number(item.price) || 0));
+            const calculateTotal = () => items.reduce((sum, item) => sum + getAmount(item), 0);
+            
             const handleLogoChange = (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = () => {
                         setLogo(reader.result);
-                        localStorage.setItem("chicken_logo", reader.result);
+                        localStorage.setItem("radar_logo", reader.result);
                     };
                     reader.readAsDataURL(file);
                 }
             };
 
-            const handleInfoChange = (e) => setHeaderInfo({ ...headerInfo, [e.target.name]: e.target.value });
-            
-            const addItem = () => setItems([...items, { id: Date.now(), name: '', totalW: 0, tareW: 0, price: 0, note: '' }]);
-            const removeItem = (id) => setItems(items.filter(i => i.id !== id));
-            const updateItem = (id, field, val) => setItems(items.map(i => i.id === id ? { ...i, [field]: val } : i));
+            // 串接 Google 試算表
+            const syncToSheet = async () => {
+                const gasUrl = "您的_GAS_部署網址"; // 請依照下方教學替換此網址
+                if (gasUrl === "您的_GAS_部署網址") {
+                    alert("請先完成下方說明的 GAS 部署設定。");
+                    return;
+                }
 
-            // 計算邏輯
-            const getNetW = (item) => Math.max(0, (Number(item.totalW) || 0) - (Number(item.tareW) || 0)).toFixed(2);
-            const getAmount = (item) => Math.round(getNetW(item) * (Number(item.price) || 0));
-            const calculateTotal = () => items.reduce((sum, item) => sum + getAmount(item), 0);
-            
-            const formatNumber = (num) => num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                setIsSyncing(true);
+                const payload = {
+                    date: headerInfo.date,
+                    client: headerInfo.clientName,
+                    total: calculateTotal(),
+                    items: items.map(i => ({ name: i.name, net: getNetW(i), price: i.price, subtotal: getAmount(i) }))
+                };
 
-            const exportExcel = () => {
-                const data = [
-                    ['出貨報價單'], 
-                    ['客戶:', headerInfo.clientName, '日期:', headerInfo.date],
-                    ['電話:', headerInfo.phone],
-                    [],
-                    ['品項', '總重', '空重', '淨重', '單價', '小計', '備註']
-                ];
-                items.forEach(item => {
-                    data.push([item.name, item.totalW, item.tareW, getNetW(item), item.price, getAmount(item), item.note]);
-                });
-                data.push([], ['', '', '', '', '總計', calculateTotal()]);
-
-                const ws = XLSX.utils.aoa_to_sheet(data);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "報價單");
-                XLSX.writeFile(wb, `${headerInfo.clientName || '客戶'}_出貨單.xlsx`);
+                try {
+                    await fetch(gasUrl, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    alert("資料已同步至雷達牧場試算表！");
+                } catch (e) {
+                    alert("同步失敗，請檢查網路或 GAS 設定。");
+                } finally {
+                    setIsSyncing(false);
+                }
             };
 
             const renderEdit = () => (
                 <div className="max-w-2xl mx-auto p-4 pb-28">
                     <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-xl font-bold text-gray-700 text-center flex-1">雞肉批發報價系統</h1>
-                        <label className="cursor-pointer bg-white px-3 py-1.5 rounded-lg shadow-sm border text-xs hover:bg-gray-50">
-                            {logo ? '更換 Logo' : '上傳 Logo'}
-                            <input type="file" className="hidden" onChange={handleLogoChange} accept="image/*" />
+                        <h1 className="text-2xl font-black text-brand tracking-tighter">雷達牧場 <span className="text-gray-400 font-light text-sm">數位管理系統</span></h1>
+                        <label className="cursor-pointer bg-white px-3 py-1.5 rounded-full shadow-sm border text-xs hover:bg-gray-50 transition">
+                            {logo ? '更換 LOGO' : '上傳 LOGO'}
+                            <input type="file" className="hidden" onChange={handleLogoChange} />
                         </label>
                     </div>
                     
-                    {/* 基本資料區塊 */}
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 space-y-3">
-                        <div className="flex gap-2">
-                            <div className="flex-1">
-                                <label className="text-xs text-gray-400 pl-1">客戶名稱</label>
-                                <input name="clientName" value={headerInfo.clientName} onChange={handleInfoChange} className="w-full p-2 border rounded-lg bg-gray-50 focus:bg-white" placeholder="請輸入客戶名稱" />
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-6 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-gray-400 block mb-1">客戶名稱</label>
+                                <input value={headerInfo.clientName} onChange={e => setHeaderInfo({...headerInfo, clientName: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition" placeholder="客戶姓名" />
                             </div>
-                            <div className="w-1/3">
-                                <label className="text-xs text-gray-400 pl-1">日期</label>
-                                <input type="date" name="date" value={headerInfo.date} onChange={handleInfoChange} className="w-full p-2 border rounded-lg bg-gray-50" />
+                            <div>
+                                <label className="text-xs font-bold text-gray-400 block mb-1">日期</label>
+                                <input type="date" value={headerInfo.date} onChange={e => setHeaderInfo({...headerInfo, date: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none" />
                             </div>
-                        </div>
-                        <div>
-                            <label className="text-xs text-gray-400 pl-1">客戶電話</label>
-                            <input name="phone" value={headerInfo.phone} onChange={handleInfoChange} className="w-full p-2 border rounded-lg bg-gray-50" placeholder="客戶電話" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 pt-2 border-t">
-                            <input name="companyName" value={headerInfo.companyName} onChange={handleInfoChange} className="p-2 bg-blue-50 text-blue-800 text-sm rounded-lg" placeholder="您的商號名稱" />
-                            <input name="companyPhone" value={headerInfo.companyPhone} onChange={handleInfoChange} className="p-2 bg-blue-50 text-blue-800 text-sm rounded-lg" placeholder="您的電話" />
                         </div>
                     </div>
 
-                    {/* 品項列表 */}
                     <div className="space-y-4">
                         {items.map((item, idx) => (
-                            <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 relative group">
-                                <button onClick={()=>removeItem(item.id)} className="absolute -right-2 -top-2 bg-white rounded-full p-1 text-gray-300 hover:text-red-500 shadow border"><IconClose /></button>
-                                
-                                <input value={item.name} onChange={(e)=>updateItem(item.id, 'name', e.target.value)} placeholder="品項名稱 (如：黑羽土雞)..." className="w-full bg-transparent border-b border-gray-200 pb-2 mb-3 font-bold text-gray-700 outline-none focus:border-blue-500" />
-                                
+                            <div key={item.id} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 transition hover:border-green-200">
+                                <input value={item.name} onChange={e => setItems(items.map(i => i.id === item.id ? {...i, name: e.target.value} : i))} className="w-full text-lg font-bold text-gray-700 bg-transparent border-b border-gray-100 pb-2 mb-4 outline-none focus:border-green-500" />
                                 <div className="grid grid-cols-3 gap-3">
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 block mb-1">總重</label>
-                                        <input type="number" value={item.totalW} onChange={(e)=>updateItem(item.id, 'totalW', e.target.value)} className="w-full p-2 bg-gray-50 rounded border text-sm font-semibold" />
+                                    <div className="bg-gray-50 p-2 rounded-2xl">
+                                        <label className="text-[10px] text-gray-400 block text-center uppercase">Total W (總重)</label>
+                                        <input type="number" value={item.totalW} onChange={e => setItems(items.map(i => i.id === item.id ? {...i, totalW: e.target.value} : i))} className="w-full text-center bg-transparent font-bold" />
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 block mb-1">空重</label>
-                                        <input type="number" value={item.tareW} onChange={(e)=>updateItem(item.id, 'tareW', e.target.value)} className="w-full p-2 bg-gray-50 rounded border text-sm" />
+                                    <div className="bg-gray-50 p-2 rounded-2xl">
+                                        <label className="text-[10px] text-gray-400 block text-center uppercase">Tare W (空重)</label>
+                                        <input type="number" value={item.tareW} onChange={e => setItems(items.map(i => i.id === item.id ? {...i, tareW: e.target.value} : i))} className="w-full text-center bg-transparent" />
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 block mb-1">單價</label>
-                                        <input type="number" value={item.price} onChange={(e)=>updateItem(item.id, 'price', e.target.value)} className="w-full p-2 bg-blue-50 text-blue-700 rounded border border-blue-100 text-sm font-bold" />
+                                    <div className="bg-brand/10 p-2 rounded-2xl border border-brand/20">
+                                        <label className="text-[10px] text-brand block text-center uppercase font-bold">Price (單價)</label>
+                                        <input type="number" value={item.price} onChange={e => setItems(items.map(i => i.id === item.id ? {...i, price: e.target.value} : i))} className="w-full text-center bg-transparent text-brand font-black" />
                                     </div>
                                 </div>
-                                <div className="mt-3 flex justify-between items-center text-sm pt-2 border-t border-dashed">
-                                    <span className="text-gray-500">淨重：<b className="text-gray-800">{getNetW(item)}</b></span>
-                                    <span className="text-blue-600 font-bold text-base">${formatNumber(getAmount(item))}</span>
+                                <div className="mt-4 flex justify-between items-end">
+                                    <div className="text-sm text-gray-400">淨重：<span className="text-gray-800 font-bold">{getNetW(item)}</span> kg</div>
+                                    <div className="text-xl font-black text-brand">${getAmount(item).toLocaleString()}</div>
                                 </div>
-                                <input value={item.note} onChange={(e)=>updateItem(item.id, 'note', e.target.value)} placeholder="備註..." className="mt-2 w-full text-xs text-gray-400 bg-transparent outline-none" />
                             </div>
                         ))}
                     </div>
 
-                    <button onClick={addItem} className="mt-6 w-full py-4 border-2 border-dashed border-gray-300 text-gray-400 rounded-xl hover:bg-white hover:text-blue-500 hover:border-blue-300 transition-all flex items-center justify-center font-bold">
-                        <IconPlus/> 新增品項
+                    <button onClick={() => setItems([...items, { id: Date.now(), name: '', totalW: 0, tareW: 0, price: 0 }])} className="w-full py-4 mt-6 border-2 border-dashed border-gray-200 rounded-3xl text-gray-400 font-bold hover:bg-white hover:text-brand hover:border-brand transition-all flex items-center justify-center gap-2">
+                        <IconPlus /> 新增品項
                     </button>
 
-                    <div className="mt-8 bg-white p-4 rounded-xl border border-gray-200">
-                        <label className="text-xs font-bold text-gray-500 block mb-2">備註條款</label>
-                        <textarea name="footerNote" value={headerInfo.footerNote} onChange={handleInfoChange} rows="4" className="w-full p-2 border rounded-lg bg-gray-50 text-sm leading-relaxed"></textarea>
-                    </div>
-
-                    {/* 底部固定欄 */}
-                    <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-[0_-5px_15px_rgba(0,0,0,0.1)] z-50">
+                    <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t p-4 z-50">
                         <div className="max-w-2xl mx-auto flex items-center justify-between">
-                            <div className="flex flex-col">
-                                <span className="text-xs text-gray-500">總計金額</span>
-                                <span className="text-2xl font-bold text-blue-600">${formatNumber(calculateTotal())}</span>
+                            <div>
+                                <span className="text-xs text-gray-400 block">雷達牧場 總計</span>
+                                <span className="text-2xl font-black text-brand">${calculateTotal().toLocaleString()}</span>
                             </div>
-                            <button onClick={()=>setMode('preview')} className="bg-blue-600 text-white px-8 py-3 rounded-full font-bold shadow-md hover:bg-blue-700 transition">
-                                產生報價單
-                            </button>
+                            <div className="flex gap-2">
+                                <button onClick={syncToSheet} disabled={isSyncing} className={`p-3 rounded-2xl border border-gray-200 hover:bg-gray-50 transition ${isSyncing ? 'animate-spin opacity-50' : ''}`}>
+                                    <IconSync />
+                                </button>
+                                <button onClick={() => setMode('preview')} className="bg-brand text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-green-900/20 hover:scale-105 transition active:scale-95">
+                                    產生報價單
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             );
 
             const renderPreview = () => (
-                <div className="min-h-screen bg-gray-600 pb-10">
-                    <div className="bg-gray-800 text-white p-3 sticky top-0 z-50 no-print shadow-md">
-                        <div className="max-w-4xl mx-auto flex justify-between items-center">
-                            <button onClick={()=>setMode('edit')} className="flex items-center text-gray-300 hover:text-white px-2 py-1">
-                                <IconBack/> 返回編輯
-                            </button>
-                            <div className="flex gap-2">
-                                <button onClick={exportExcel} className="bg-green-600 px-4 py-2 rounded flex items-center text-sm hover:bg-green-700">
-                                    <IconDownload/> <span className="ml-1">Excel</span>
-                                </button>
-                                <button onClick={() => window.print()} className="bg-blue-600 px-4 py-2 rounded flex items-center text-sm hover:bg-blue-700 font-bold">
-                                    <IconPrinter/> <span className="ml-1">列印 / 存為 PDF</span>
-                                </button>
-                            </div>
-                        </div>
+                <div className="min-h-screen bg-gray-800 pb-10">
+                    <div className="no-print p-4 flex justify-between max-w-[210mm] mx-auto text-white">
+                        <button onClick={() => setMode('edit')} className="opacity-70 hover:opacity-100">← 返回雷達牧場系統</button>
+                        <button onClick={() => window.print()} className="bg-brand px-6 py-2 rounded-full font-bold">列印 / 存為 PDF</button>
                     </div>
-
-                    <div className="print-container w-full sm:w-[210mm] min-h-[297mm] mx-auto bg-white shadow-2xl my-8 p-[15mm] relative serif text-black">
-                        <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
+                    <div className="print-container w-[210mm] min-h-[297mm] mx-auto bg-white p-[20mm] relative serif shadow-2xl">
+                        <div className="flex justify-between items-start border-b-4 border-brand pb-6 mb-8">
                             <div>
-                                <h1 className="text-4xl font-bold tracking-widest mb-2">出 貨 報 價 單</h1>
-                                <p className="text-sm font-bold">{headerInfo.companyName}</p>
-                                <p className="text-xs">電話：{headerInfo.companyPhone}</p>
+                                <h1 className="text-4xl font-bold text-brand tracking-[0.2em] mb-2">雷達牧場 - 出貨單</h1>
+                                <p className="text-sm">客戶：{headerInfo.clientName}</p>
+                                <p className="text-sm">日期：{headerInfo.date}</p>
                             </div>
-                            {logo && <img src={logo} className="max-h-20 max-w-[200px] object-contain" />}
+                            {logo && <img src={logo} className="max-h-24 max-w-[200px] object-contain" />}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 mb-8 text-sm">
-                            <div className="space-y-1">
-                                <div className="flex border-b border-gray-200 py-1"><span className="font-bold w-20">客戶名稱：</span><span>{headerInfo.clientName}</span></div>
-                                <div className="flex border-b border-gray-200 py-1"><span className="font-bold w-20">聯絡電話：</span><span>{headerInfo.phone}</span></div>
-                            </div>
-                            <div className="space-y-1 text-right">
-                                <div className="py-1"><span className="font-bold">報價日期：</span><span>{headerInfo.date}</span></div>
-                            </div>
-                        </div>
-
-                        <table className="w-full border-collapse border border-black text-sm mb-6">
+                        <table className="w-full border-collapse mb-10">
                             <thead>
-                                <tr className="bg-gray-100 print:bg-gray-100">
-                                    <th className="border border-black p-2 w-12 text-center">#</th>
-                                    <th className="border border-black p-2 text-left">品項描述</th>
-                                    <th className="border border-black p-2 w-20 text-center">總重</th>
-                                    <th className="border border-black p-2 w-20 text-center">空重</th>
-                                    <th className="border border-black p-2 w-20 text-center">淨重</th>
-                                    <th className="border border-black p-2 w-20 text-right">單價</th>
-                                    <th className="border border-black p-2 w-28 text-right">金額</th>
+                                <tr className="bg-brand text-white">
+                                    <th className="p-3 text-left">品項名稱</th>
+                                    <th className="p-3">總重</th>
+                                    <th className="p-3">空重</th>
+                                    <th className="p-3">淨重</th>
+                                    <th className="p-3 text-right">單價</th>
+                                    <th className="p-3 text-right">小計</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody className="text-sm">
                                 {items.map((item, idx) => (
-                                    <tr key={item.id} className="page-break">
-                                        <td className="border border-black p-2 text-center">{idx + 1}</td>
-                                        <td className="border border-black p-2">
-                                            <div className="font-bold">{item.name}</div>
-                                            {item.note && <div className="text-xs text-gray-500 italic">{item.note}</div>}
-                                        </td>
-                                        <td className="border border-black p-2 text-center">{item.totalW}</td>
-                                        <td className="border border-black p-2 text-center">{item.tareW}</td>
-                                        <td className="border border-black p-2 text-center font-bold">{getNetW(item)}</td>
-                                        <td className="border border-black p-2 text-right">{formatNumber(item.price)}</td>
-                                        <td className="border border-black p-2 text-right font-bold">{formatNumber(getAmount(item))}</td>
-                                    </tr>
-                                ))}
-                                {Array.from({ length: Math.max(0, 8 - items.length) }).map((_, i) => (
-                                    <tr key={`empty-${i}`} className="h-8">
-                                        <td className="border border-black"></td><td className="border border-black"></td>
-                                        <td className="border border-black"></td><td className="border border-black"></td>
-                                        <td className="border border-black"></td><td className="border border-black"></td>
-                                        <td className="border border-black"></td>
+                                    <tr key={idx} className="border-b border-gray-100">
+                                        <td className="p-3 font-bold">{item.name}</td>
+                                        <td className="p-3 text-center">{item.totalW}</td>
+                                        <td className="p-3 text-center">{item.tareW}</td>
+                                        <td className="p-3 text-center font-bold">{getNetW(item)}</td>
+                                        <td className="p-3 text-right">{item.price}</td>
+                                        <td className="p-3 text-right font-bold">${getAmount(item).toLocaleString()}</td>
                                     </tr>
                                 ))}
                             </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td colSpan="5" className="border border-black p-3 text-right font-bold bg-gray-50">總計金額 (TWD)</td>
-                                    <td colSpan="2" className="border border-black p-3 text-right font-bold text-xl">${formatNumber(calculateTotal())}</td>
-                                </tr>
-                            </tfoot>
                         </table>
 
-                        <div className="grid grid-cols-1 gap-8">
-                            <div className="border border-black p-4 text-xs h-32 page-break">
-                                <p className="font-bold mb-2">備註事項：</p>
-                                <div className="whitespace-pre-wrap leading-loose">{headerInfo.footerNote}</div>
+                        <div className="flex justify-end mb-12">
+                            <div className="bg-brand text-white p-6 rounded-br-3xl text-right min-w-[200px]">
+                                <span className="text-xs opacity-80 block mb-1 uppercase">Total Amount</span>
+                                <span className="text-3xl font-black">${calculateTotal().toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between mt-12 px-8">
-                                <div className="w-1/3 border-t border-black pt-2 text-center font-bold">客戶簽認</div>
-                                <div className="w-1/3 border-t border-black pt-2 text-center font-bold">送貨人簽章</div>
-                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-10 mt-20 px-4">
+                            <div className="border-t border-gray-400 pt-2 text-center text-sm font-bold">客戶簽認 (簽名)</div>
+                            <div className="border-t border-gray-400 pt-2 text-center text-sm font-bold">雷達牧場 蓋章</div>
                         </div>
                     </div>
                 </div>
