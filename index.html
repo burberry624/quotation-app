@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>雷達牧場 - 雞肉批發報價系統 (V11)</title>
+    <title>雷達牧場 - 雞肉批發報價系統 (V12)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -12,48 +12,101 @@
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Noto+Serif+TC:wght@400;700&display=swap');
         :root { --brand-color: #2D5A27; }
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f9fafb; }
-        .serif { font-family: 'Noto Serif TC', serif; }
+        .serif  { font-family: 'Noto Serif TC', serif; }
         .text-brand { color: var(--brand-color); }
-        .bg-brand { background-color: var(--brand-color); }
+        .bg-brand   { background-color: var(--brand-color); }
 
-        @media print {
-            @page { size: A4; margin: 0; }
-            body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .no-print { display: none !important; }
-            .print-container { width: 100% !important; margin: 0 !important; padding: 15mm !important; box-shadow: none !important; }
-            table, th, td { border-color: black !important; }
+        /* ── 品項下拉搜尋樣式 ── */
+        .item-dropdown-wrap { position: relative; }
+        .item-dropdown-list {
+            position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
+            background: white; border: 2px solid #d1fae5;
+            border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            max-height: 220px; overflow-y: auto; margin-top: 4px;
         }
+        .item-dropdown-list li {
+            padding: 10px 16px; cursor: pointer; font-weight: 700;
+            transition: background 0.15s;
+        }
+        .item-dropdown-list li:hover,
+        .item-dropdown-list li.active { background: #d1fae5; color: #2D5A27; }
 
-        /* 報價單表格固定欄位寬度 */
+        /* ── 報價單固定欄寬 ── */
         .col-seq    { width: 28px;  }
-        .col-name   { width: 108px; }  /* 寬到容納「黑羽土雞（公）」 */
-        .col-qty    { width: 55px;  }  /* 4位數字 */
+        .col-name   { width: 110px; }
+        .col-qty    { width: 56px;  }
         .col-totalw { width: 62px;  }
         .col-tarew  { width: 62px;  }
-        .col-net    { width: 73px;  }
-        .col-price  { width: 56px;  }  /* 3位數字 */
-        .col-sub    { width: 85px;  }
+        .col-net    { width: 75px;  }
+        .col-price  { width: 55px;  }
+        .col-sub    { width: 83px;  }
 
-        /* 總金額方塊：粗框線，無底色 */
+        /* ── 總計金額框（粗框線、無底色） ── */
         .total-box {
             border: 3px solid black;
             padding: 14px 22px;
             text-align: right;
             display: inline-block;
-            min-width: 255px;
+            min-width: 260px;
+        }
+
+        /* ── 帳務狀態表格：左側直書文字 ── */
+        .account-sidebar {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            letter-spacing: 0.25em;
+            font-weight: 900;
+            font-size: 0.85rem;
+            padding: 8px 4px;
+            border-right: 2px solid black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media print {
+            @page { size: A4; margin: 0; }
+            body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .print-container { width: 100% !important; margin: 0 !important; padding: 13mm !important; box-shadow: none !important; }
+            table, th, td { border-color: black !important; }
         }
     </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-    const { useState, useEffect, useCallback } = React;
+    const { useState, useEffect, useCallback, useRef } = React;
 
     // ═══════════════════════════════════════════════════
     // ⚙️  設定區：請填入你的 GAS 網址
     // ═══════════════════════════════════════════════════
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbweA_4cGkP5__LOfLLgZRK7qtSEwr5uzshAKloJkgQtmnQy0POS-sYMkpvD-j3RYTCx/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwTqsrRKi-0Nby52jD1jVV7SHe9s827Lhqy_aHp2m6fVkex-skXAMNGC5rlfhfIu4D9/exec";
     // ═══════════════════════════════════════════════════
+
+    // ── 下拉品項清單 ──
+    const PRODUCT_LIST = [
+        "黑羽土雞(公)", "黑羽土雞(母)",
+        "古早雞(公)",   "古早雞(母)",
+        "紅羽土雞(公)", "紅羽土雞(母)",
+        "烏骨雞(公)",   "烏骨雞(母)",
+        "番鴨(公)",     "番鴨(母)",
+        "鵝(公)",       "鵝(母)",
+    ];
+
+    // ── 報價單號產生器（每日遞增） ──
+    const getNextQuoteNo = (date) => {
+        const key  = "radar_quoteSeq_" + date;
+        const seq  = (parseInt(localStorage.getItem(key) || "0", 10)) + 1;
+        localStorage.setItem(key, String(seq));
+        const d = date.replace(/-/g, "");
+        return `RD${d}-${seq}`;
+    };
+    const peekQuoteNo = (date) => {
+        const key = "radar_quoteSeq_" + date;
+        const seq = parseInt(localStorage.getItem(key) || "0", 10) + 1;
+        return `RD${date.replace(/-/g, "")}-${seq}`;
+    };
 
     const IconPlus  = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>;
     const IconSync  = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>;
@@ -62,16 +115,17 @@
     const IconCheck = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>;
 
     const DEFAULT_HEADER = {
-        clientName: '', clientPhone: '',
+        clientName: '', clientPhone: '', clientAddress: '',
         date: new Date().toISOString().split('T')[0],
         companyName: '雷達牧場',
-        footerNote: '1. 重量以實際過秤為準。\n2. 貨到請當面點交，簽收後概不負責。'
+        footerNote: '1. 重量以實際過秤為準。\n2. 貨到請當面點交，簽收後概不負責。',
+        accountStatus: '',   // 'settled' | 'pending' | ''
     };
 
     const sanitizeNumber = (val) => String(val).replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
-    const safeNum = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-    const getNetW = (item) => Math.max(0, safeNum(item.totalW) - safeNum(item.tareW)).toFixed(2);
-    const getAmount = (item) => Math.round(parseFloat(getNetW(item)) * safeNum(item.price));
+    const safeNum  = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+    const getNetW  = (item) => Math.max(0, safeNum(item.totalW) - safeNum(item.tareW)).toFixed(2);
+    const getAmount= (item) => Math.round(parseFloat(getNetW(item)) * safeNum(item.price));
 
     const safeSetItem = (key, value) => {
         try { localStorage.setItem(key, JSON.stringify(value)); }
@@ -84,14 +138,65 @@
 
     const newItem = () => ({ id: crypto.randomUUID(), name: '', qty: '', totalW: '', tareW: '', price: '', note: '' });
 
-    const App = () => {
-        const [mode, setMode] = useState('edit');
-        const [syncStatus, setSyncStatus] = useState('idle');
-        const [syncMsg, setSyncMsg] = useState('');
-        const [headerInfo, setHeaderInfo] = useState(() => safeGetItem('radar_header', DEFAULT_HEADER));
-        const [items, setItems] = useState(() => safeGetItem('radar_items', [{ ...newItem(), name: '黑羽土雞' }]));
+    // ── 品項下拉搜尋元件 ──
+    const ProductInput = ({ value, onChange }) => {
+        const [open, setOpen]     = useState(false);
+        const [query, setQuery]   = useState(value);
+        const wrapRef             = useRef(null);
 
-        useEffect(() => { safeSetItem('radar_header', headerInfo); safeSetItem('radar_items', items); }, [headerInfo, items]);
+        useEffect(() => { setQuery(value); }, [value]);
+
+        // 點外面關閉
+        useEffect(() => {
+            const handler = (e) => {
+                if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+            };
+            document.addEventListener('mousedown', handler);
+            return () => document.removeEventListener('mousedown', handler);
+        }, []);
+
+        const filtered = PRODUCT_LIST.filter(p =>
+            p.toLowerCase().includes(query.toLowerCase())
+        );
+
+        const select = (name) => {
+            setQuery(name);
+            onChange(name);
+            setOpen(false);
+        };
+
+        return (
+            <div className="item-dropdown-wrap" ref={wrapRef}>
+                <input
+                    value={query}
+                    onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
+                    onFocus={() => setOpen(true)}
+                    className="w-full text-xl font-black text-gray-800 bg-transparent border-b-2 border-gray-100 outline-none focus:border-green-500 mb-1 pb-1"
+                    placeholder="品項名稱（點擊或輸入關鍵字搜尋）"
+                />
+                {open && filtered.length > 0 && (
+                    <ul className="item-dropdown-list">
+                        {filtered.map(p => (
+                            <li key={p} onMouseDown={() => select(p)}>{p}</li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        );
+    };
+
+    const App = () => {
+        const [mode, setMode]           = useState('edit');
+        const [syncStatus, setSyncStatus] = useState('idle');
+        const [syncMsg, setSyncMsg]     = useState('');
+        const [quoteNo, setQuoteNo]     = useState('');   // 確認後鎖定的單號
+        const [headerInfo, setHeaderInfo] = useState(() => safeGetItem('radar_header', DEFAULT_HEADER));
+        const [items, setItems]         = useState(() => safeGetItem('radar_items', [{ ...newItem() }]));
+
+        useEffect(() => {
+            safeSetItem('radar_header', headerInfo);
+            safeSetItem('radar_items', items);
+        }, [headerInfo, items]);
 
         const calculateTotal = useCallback(() => items.reduce((s, i) => s + getAmount(i), 0), [items]);
 
@@ -103,7 +208,8 @@
         const clearAll = () => {
             if (window.confirm('確定要清空所有資料、開立新報價單嗎？\n此操作無法復原。')) {
                 setHeaderInfo({ ...DEFAULT_HEADER, date: new Date().toISOString().split('T')[0] });
-                setItems([{ ...newItem(), name: '' }]);
+                setItems([{ ...newItem() }]);
+                setQuoteNo('');
             }
         };
 
@@ -112,26 +218,37 @@
             setItems(p => p.map(i => i.id === id ? { ...i, [field]: value } : i));
         };
 
+        // ── 帳務狀態必填驗證 ──
         const handlePreview = () => {
             if (!headerInfo.clientName.trim()) { alert('請填寫客戶名稱後再完成報價。'); return; }
+            if (!headerInfo.accountStatus)     { alert('請選擇帳務狀態後再完成報價。'); return; }
             if (calculateTotal() === 0 && !window.confirm('目前總金額為 $0，確定繼續？')) return;
+            // 鎖定單號
+            const no = getNextQuoteNo(headerInfo.date);
+            setQuoteNo(no);
             setMode('preview');
         };
 
+        // ── 同步至 Google Sheet ──
         const syncToSheet = () => {
             if (!GAS_URL || GAS_URL.includes('請貼上')) {
                 alert('❌ 請先在程式碼的 GAS_URL 變數填入你的 Google Apps Script 部署網址！');
                 return;
             }
+            if (!headerInfo.accountStatus) { alert('請選擇帳務狀態後再同步。'); return; }
             setSyncStatus('syncing');
             setSyncMsg('正在連線至 Google 試算表...');
-            const total = calculateTotal();
+            const total   = calculateTotal();
+            const useNo   = quoteNo || peekQuoteNo(headerInfo.date);
             const payload = {
-                date: headerInfo.date,
-                client: headerInfo.clientName,
-                phone: headerInfo.clientPhone,
+                date:          headerInfo.date,
+                quoteNo:       useNo,
+                client:        headerInfo.clientName,
+                phone:         headerInfo.clientPhone,
+                address:       headerInfo.clientAddress,
+                accountStatus: headerInfo.accountStatus,
                 total,
-                note: headerInfo.footerNote,
+                note:          headerInfo.footerNote,
                 items: items.map(i => ({
                     name: i.name, qty: i.qty,
                     totalW: i.totalW, tareW: i.tareW,
@@ -143,25 +260,21 @@
             const script = document.createElement('script');
             let done = false;
             const timeout = setTimeout(() => {
-                if (done) return;
-                done = true;
-                delete window[cbName];
-                document.body.removeChild(script);
+                if (done) return; done = true;
+                delete window[cbName]; document.body.removeChild(script);
                 setSyncStatus('error');
                 setSyncMsg('⏱ 連線逾時，請確認網路或 GAS 網址是否正確。');
             }, 15000);
             window[cbName] = (result) => {
-                if (done) return;
-                done = true;
+                if (done) return; done = true;
                 clearTimeout(timeout);
-                delete window[cbName];
-                document.body.removeChild(script);
+                delete window[cbName]; document.body.removeChild(script);
                 if (result && result.status === 'ok') {
                     setSyncStatus('success');
                     setSyncMsg(`✅ 成功寫入試算表！工作表：${result.sheet || headerInfo.date}`);
                 } else {
                     setSyncStatus('error');
-                    setSyncMsg('❌ 寫入失敗：' + (result && result.message ? result.message : '未知錯誤'));
+                    setSyncMsg('❌ 寫入失敗：' + (result?.message || '未知錯誤'));
                 }
             };
             const encoded = encodeURIComponent(JSON.stringify(payload));
@@ -176,16 +289,18 @@
             error:   'border-red-300 text-red-500 bg-red-50',
         }[syncStatus];
 
-        // ─────────────────────────────────────────────
+        // ══════════════════════════════════════════
         // 編輯畫面
-        // ─────────────────────────────────────────────
+        // ══════════════════════════════════════════
         const renderEdit = () => (
             <div className="max-w-2xl mx-auto p-4 pb-44">
+                {/* 標題 */}
                 <div className="text-center mb-8 pt-4">
                     <h1 className="text-2xl font-black text-brand tracking-wider">雷達牧場雞肉批發報價系統</h1>
-                    <p className="text-gray-400 text-xs font-bold mt-1 uppercase">Professional Edition V11 — Google Sheets 串聯版</p>
+                    <p className="text-gray-400 text-xs font-bold mt-1 uppercase">Professional Edition V12 — Google Sheets 串聯版</p>
                 </div>
 
+                {/* 同步狀態提示 */}
                 {syncStatus !== 'idle' && (
                     <div className={`mb-4 px-4 py-3 rounded-2xl text-sm font-bold flex items-center gap-2 ${
                         syncStatus === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
@@ -201,30 +316,59 @@
                     </div>
                 )}
 
+                {/* ── 基本資訊 ── */}
                 <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 第一行：客戶名稱 / 客戶電話 / 出貨日期 */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
                             <label className="text-sm font-black text-black block mb-1">客戶名稱 <span className="text-red-400">*</span></label>
-                            <input value={headerInfo.clientName} onChange={e => setHeaderInfo({...headerInfo, clientName: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-bold" placeholder="請輸入姓名" />
+                            <input value={headerInfo.clientName}
+                                onChange={e => setHeaderInfo({...headerInfo, clientName: e.target.value})}
+                                className="w-full p-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                                placeholder="請輸入姓名" />
                         </div>
                         <div>
                             <label className="text-sm font-black text-black block mb-1">客戶電話</label>
-                            <input value={headerInfo.clientPhone} onChange={e => setHeaderInfo({...headerInfo, clientPhone: e.target.value})} inputMode="tel" className="w-full p-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-bold" placeholder="請輸入電話" />
+                            <input value={headerInfo.clientPhone}
+                                onChange={e => setHeaderInfo({...headerInfo, clientPhone: e.target.value})}
+                                inputMode="tel"
+                                className="w-full p-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                                placeholder="請輸入電話" />
                         </div>
                         <div>
                             <label className="text-sm font-black text-black block mb-1">出貨日期</label>
-                            <input type="date" value={headerInfo.date} onChange={e => setHeaderInfo({...headerInfo, date: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl outline-none font-bold" />
+                            <input type="date" value={headerInfo.date}
+                                onChange={e => setHeaderInfo({...headerInfo, date: e.target.value})}
+                                className="w-full p-3 bg-gray-50 rounded-xl outline-none font-bold" />
                         </div>
+                    </div>
+                    {/* 第二行：客戶地址（一.1 新增） */}
+                    <div>
+                        <label className="text-sm font-black text-black block mb-1">客戶地址</label>
+                        <input value={headerInfo.clientAddress}
+                            onChange={e => setHeaderInfo({...headerInfo, clientAddress: e.target.value})}
+                            className="w-full p-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                            placeholder="請輸入送貨地址" />
                     </div>
                 </div>
 
+                {/* ── 品項列表 ── */}
                 <div className="space-y-4">
                     {items.map((item) => (
                         <div key={item.id} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 relative transition-all hover:border-green-200">
                             <button onClick={() => removeItem(item.id)} className="absolute -right-2 -top-2 bg-white rounded-full p-1 text-gray-300 hover:text-red-500 shadow border" title="刪除">
                                 <IconClose />
                             </button>
-                            <input value={item.name} onChange={e => updateItem(item.id, 'name', e.target.value)} className="w-full text-xl font-black text-gray-800 bg-transparent border-b-2 border-gray-100 outline-none focus:border-green-500 mb-4 pb-1" placeholder="品項名稱（如：黑羽土雞）" />
+
+                            {/* 一.2：下拉品項搜尋 */}
+                            <div className="mb-4">
+                                <ProductInput
+                                    value={item.name}
+                                    onChange={v => updateItem(item.id, 'name', v)}
+                                />
+                            </div>
+
+                            {/* 數量/重量/單價 */}
                             <div className="grid grid-cols-4 gap-2">
                                 {[
                                     { field:'qty',    label:'數量/籠', cls:'bg-gray-50 border-gray-100',   tcls:'text-gray-800' },
@@ -234,14 +378,49 @@
                                 ].map(({ field, label, cls, tcls }) => (
                                     <div key={field} className={`${cls} p-2 rounded-xl border`}>
                                         <label className="text-xs font-black text-black block text-center mb-1">{label}</label>
-                                        <input type="text" inputMode="decimal" value={item[field]} onChange={e => updateItem(item.id, field, e.target.value)} placeholder="0" className={`w-full text-center bg-transparent font-black text-lg ${tcls}`} />
+                                        <input type="text" inputMode="decimal" value={item[field]}
+                                            onChange={e => updateItem(item.id, field, e.target.value)}
+                                            placeholder="0"
+                                            className={`w-full text-center bg-transparent font-black text-lg ${tcls}`} />
                                     </div>
                                 ))}
                             </div>
-                            {/* 一-1：項目備註 placeholder 改為籠內放幾隻雞 */}
+
+                            {/* 項目備註 */}
                             <div className="mt-4">
-                                <input value={item.note} onChange={e => updateItem(item.id, 'note', e.target.value)} className="w-full text-sm text-gray-500 bg-gray-50/80 p-2 rounded-xl italic outline-none border border-transparent focus:border-gray-200" placeholder="項目備註（如：一籠需放置幾隻雞）" />
+                                <input value={item.note}
+                                    onChange={e => updateItem(item.id, 'note', e.target.value)}
+                                    className="w-full text-sm text-gray-500 bg-gray-50/80 p-2 rounded-xl italic outline-none border border-transparent focus:border-gray-200"
+                                    placeholder="項目備註（如：一籠需放置幾隻雞）" />
                             </div>
+
+                            {/* 一.3：帳務狀態（品項下方、必填） */}
+                            {items.indexOf(item) === items.length - 1 && (
+                                <div className="mt-5 border-t border-dashed border-gray-200 pt-4">
+                                    <label className="text-sm font-black text-black block mb-2">
+                                        帳務狀態 <span className="text-red-400">*</span>
+                                        {!headerInfo.accountStatus && <span className="ml-2 text-red-400 text-xs font-bold">（必填）</span>}
+                                    </label>
+                                    <div className="flex gap-4">
+                                        <label className={`flex-1 flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition ${headerInfo.accountStatus === 'settled' ? 'border-green-500 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
+                                            <input type="radio" name="accountStatus" value="settled"
+                                                checked={headerInfo.accountStatus === 'settled'}
+                                                onChange={() => setHeaderInfo({...headerInfo, accountStatus: 'settled'})}
+                                                className="accent-green-600 w-5 h-5" />
+                                            <span className="font-black text-base">✅ 款項已結清</span>
+                                        </label>
+                                        <label className={`flex-1 flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition ${headerInfo.accountStatus === 'pending' ? 'border-orange-400 bg-orange-50' : 'border-gray-100 bg-gray-50'}`}>
+                                            <input type="radio" name="accountStatus" value="pending"
+                                                checked={headerInfo.accountStatus === 'pending'}
+                                                onChange={() => setHeaderInfo({...headerInfo, accountStatus: 'pending'})}
+                                                className="accent-orange-500 w-5 h-5" />
+                                            <span className="font-black text-base">⏳ 款項未結清</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 淨重 / 小計 */}
                             <div className="mt-4 flex justify-between items-center pt-3 border-t border-dashed border-gray-200">
                                 <span className="text-sm font-bold text-black">淨重：<b className="text-xl text-black font-black">{getNetW(item)} 斤</b></span>
                                 <span className="text-brand font-black text-2xl">${getAmount(item).toLocaleString()}</span>
@@ -250,19 +429,27 @@
                     ))}
                 </div>
 
-                <button onClick={() => setItems(p => [...p, newItem()])} className="w-full py-4 mt-8 border-2 border-dashed border-black/20 rounded-3xl text-black font-black hover:bg-white hover:border-brand hover:text-brand transition-all flex items-center justify-center gap-2">
+                {/* 新增品項 */}
+                <button onClick={() => setItems(p => [...p, newItem()])}
+                    className="w-full py-4 mt-8 border-2 border-dashed border-black/20 rounded-3xl text-black font-black hover:bg-white hover:border-brand hover:text-brand transition-all flex items-center justify-center gap-2">
                     <IconPlus /> 新增品項
                 </button>
 
+                {/* 備註/條款 */}
                 <div className="mt-10 bg-white p-5 rounded-3xl border border-gray-100">
                     <label className="text-sm font-black text-black block mb-2 px-1">備註 / 條款</label>
-                    <textarea value={headerInfo.footerNote} onChange={e => setHeaderInfo({...headerInfo, footerNote: e.target.value})} rows="3" className="w-full p-4 bg-gray-50 rounded-2xl text-sm outline-none font-medium text-gray-700" />
+                    <textarea value={headerInfo.footerNote}
+                        onChange={e => setHeaderInfo({...headerInfo, footerNote: e.target.value})}
+                        rows="3"
+                        className="w-full p-4 bg-gray-50 rounded-2xl text-sm outline-none font-medium text-gray-700" />
                 </div>
 
+                {/* 清空 */}
                 <button onClick={clearAll} className="w-full py-3 mt-4 border border-red-200 rounded-2xl text-red-400 text-sm font-bold hover:bg-red-50 transition-all flex items-center justify-center gap-2">
                     <IconTrash /> 清空全部，開立新報價單
                 </button>
 
+                {/* 底部固定列 */}
                 <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t-2 border-gray-100 p-4 z-50 shadow-2xl">
                     <div className="max-w-2xl mx-auto">
                         <div className="flex items-center justify-between mb-2">
@@ -271,11 +458,14 @@
                                 <span className="text-4xl font-black text-black tracking-tighter">${calculateTotal().toLocaleString()}</span>
                             </div>
                             <div className="flex gap-3 items-center">
-                                <button onClick={syncToSheet} disabled={syncStatus === 'syncing'} title="同步至 Google 試算表" className={`flex items-center gap-2 px-4 py-3 rounded-2xl border-2 font-bold text-sm transition ${syncBtnClass}`}>
+                                <button onClick={syncToSheet} disabled={syncStatus === 'syncing'}
+                                    title="同步至 Google 試算表"
+                                    className={`flex items-center gap-2 px-4 py-3 rounded-2xl border-2 font-bold text-sm transition ${syncBtnClass}`}>
                                     <span className={syncStatus === 'syncing' ? 'animate-spin inline-block' : 'inline-block'}><IconSync /></span>
                                     {syncStatus === 'syncing' ? '同步中...' : syncStatus === 'success' ? '已同步' : '同步試算表'}
                                 </button>
-                                <button onClick={handlePreview} className="bg-brand text-white px-8 py-3 rounded-2xl font-black text-lg shadow-xl shadow-green-900/20 hover:scale-105 transition active:scale-95">
+                                <button onClick={handlePreview}
+                                    className="bg-brand text-white px-8 py-3 rounded-2xl font-black text-lg shadow-xl shadow-green-900/20 hover:scale-105 transition active:scale-95">
                                     完成報價
                                 </button>
                             </div>
@@ -286,110 +476,154 @@
             </div>
         );
 
-        // ─────────────────────────────────────────────
+        // ══════════════════════════════════════════
         // 預覽 / 列印畫面
-        // ─────────────────────────────────────────────
-        const renderPreview = () => (
-            <div className="min-h-screen bg-gray-800 pb-10">
-                <div className="no-print p-4 flex justify-between max-w-[210mm] mx-auto text-white">
-                    <button onClick={() => setMode('edit')} className="font-bold opacity-70 hover:opacity-100">← 返回編輯畫面</button>
-                    <button onClick={() => window.print()} className="bg-brand px-8 py-2 rounded-full font-black">列印 / 存為 PDF</button>
-                </div>
+        // ══════════════════════════════════════════
+        const renderPreview = () => {
+            // 帳務狀態標籤
+            const acctLabel = headerInfo.accountStatus === 'settled' ? '款項已結清' : '款項未結清';
+            const acctSettled = headerInfo.accountStatus === 'settled';
 
-                <div className="print-container w-[210mm] min-h-[297mm] mx-auto bg-white p-[20mm] relative serif shadow-2xl">
-
-                    {/* 標題區 */}
-                    <div className="text-center border-b-4 border-brand pb-6 mb-6">
-                        <h1 className="text-5xl font-black text-brand tracking-[0.2em] mb-2">{headerInfo.companyName}</h1>
-                        <p className="text-base font-bold tracking-[0.5em] text-gray-500 uppercase">雞肉批發報價單</p>
-
-                        {/* 二-1：客戶資訊字體加大；出貨日期黑色 */}
-                        <div className="mt-8 flex justify-between items-end px-2">
-                            <div className="text-left space-y-3">
-                                <p className="text-base font-black">
-                                    客戶名稱：<span className="font-black border-b-2 border-black px-4 text-lg">{headerInfo.clientName || '—'}</span>
-                                </p>
-                                <p className="text-base font-black">
-                                    客戶電話：<span className="font-black border-b-2 border-black px-4 text-lg">{headerInfo.clientPhone || '—'}</span>
-                                </p>
-                            </div>
-                            <div className="text-right">
-                                {/* 出貨日期：字體加大、顏色黑色 */}
-                                <p className="text-base font-black text-black font-sans">
-                                    出貨日期：<span className="text-lg font-black">{headerInfo.date}</span>
-                                </p>
-                            </div>
-                        </div>
+            return (
+                <div className="min-h-screen bg-gray-800 pb-10">
+                    <div className="no-print p-4 flex justify-between max-w-[210mm] mx-auto text-white">
+                        <button onClick={() => setMode('edit')} className="font-bold opacity-70 hover:opacity-100">← 返回編輯畫面</button>
+                        <button onClick={() => window.print()} className="bg-brand px-8 py-2 rounded-full font-black">列印 / 存為 PDF</button>
                     </div>
 
-                    {/* 品項表格 */}
-                    <table className="w-full border-collapse border-2 border-black mb-6 text-sm" style={{tableLayout:'fixed'}}>
-                        <colgroup>
-                            <col className="col-seq" />
-                            <col className="col-name" />
-                            <col className="col-qty" />
-                            <col className="col-totalw" />
-                            <col className="col-tarew" />
-                            <col className="col-net" />
-                            <col className="col-price" />
-                            <col className="col-sub" />
-                        </colgroup>
-                        <thead>
-                            {/* 二-2：# 改為序次；二-3：標題全置中，品項名稱靠左，小計靠右 */}
-                            <tr className="bg-gray-100">
-                                <th className="border-2 border-black p-2 text-center">序次</th>
-                                <th className="border-2 border-black p-2 text-left">品項名稱</th>
-                                <th className="border-2 border-black p-2 text-center">數量/籠</th>
-                                <th className="border-2 border-black p-2 text-center">總重/斤</th>
-                                <th className="border-2 border-black p-2 text-center">空重/斤</th>
-                                <th className="border-2 border-black p-2 text-center text-brand">淨重/斤</th>
-                                <th className="border-2 border-black p-2 text-center">單價/元</th>
-                                <th className="border-2 border-black p-2 text-right font-black">小計</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {/* 二-8：只輸出有資料的列，不補空白；二-6：單價字體與小計同大 */}
-                            {items.map((item, idx) => (
-                                <tr key={item.id}>
-                                    <td className="border border-black p-2 text-center font-bold">{idx + 1}</td>
-                                    <td className="border border-black p-2 text-left">
-                                        <div className="font-black text-base">{item.name || '---'}</div>
-                                        {item.note && <div className="text-xs text-gray-500 italic mt-1 font-sans">※ {item.note}</div>}
-                                    </td>
-                                    <td className="border border-black p-2 text-center font-bold">{item.qty || '—'}</td>
-                                    <td className="border border-black p-2 text-center font-bold">{item.totalW || '—'}</td>
-                                    <td className="border border-black p-2 text-center font-bold">{item.tareW || '—'}</td>
-                                    <td className="border border-black p-2 text-center font-black text-base text-brand">{getNetW(item)}</td>
-                                    {/* 二-6：單價字體大小與小計一致（text-base font-black） */}
-                                    <td className="border border-black p-2 text-center font-black text-base">{item.price || '—'}</td>
-                                    <td className="border border-black p-2 text-right font-black text-base">${getAmount(item).toLocaleString()}</td>
+                    <div className="print-container w-[210mm] min-h-[297mm] mx-auto bg-white p-[13mm] relative serif shadow-2xl">
+
+                        {/* ── 二.(1) 右上角單號 ── */}
+                        <div className="absolute top-[13mm] right-[13mm] text-right">
+                            <span className="text-xs font-black text-gray-500 font-sans tracking-wider">單號：</span>
+                            <span className="text-sm font-black text-brand font-sans">{quoteNo}</span>
+                        </div>
+
+                        {/* ── 標題區（二.(2) 往上移） ── */}
+                        <div className="text-center border-b-4 border-brand pb-5 mb-5 pt-0">
+                            <h1 className="text-4xl font-black text-brand tracking-[0.2em] mb-1">{headerInfo.companyName}</h1>
+                            {/* 二.(2)：「雞肉批發報價單」再往上 */}
+                            <p className="text-sm font-bold tracking-[0.5em] text-gray-500 uppercase mb-0">雞肉批發報價單</p>
+
+                            {/* 客戶資訊 */}
+                            <div className="mt-6 flex justify-between items-start px-1">
+                                <div className="text-left space-y-2">
+                                    <p className="text-base font-black">
+                                        客戶名稱：<span className="font-black border-b-2 border-black px-3 text-lg">{headerInfo.clientName || '—'}</span>
+                                    </p>
+                                    <p className="text-base font-black">
+                                        客戶電話：<span className="font-black border-b-2 border-black px-3 text-lg">{headerInfo.clientPhone || '—'}</span>
+                                    </p>
+                                    {headerInfo.clientAddress && (
+                                        <p className="text-base font-black">
+                                            客戶地址：<span className="font-black border-b-2 border-black px-3 text-base">{headerInfo.clientAddress}</span>
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="text-right flex flex-col justify-end">
+                                    <p className="text-base font-black text-black font-sans">
+                                        出貨日期：<span className="text-lg font-black text-black">{headerInfo.date}</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── 品項表格 ── */}
+                        <table className="w-full border-collapse border-2 border-black mb-5 text-sm" style={{tableLayout:'fixed'}}>
+                            <colgroup>
+                                <col className="col-seq" />
+                                <col className="col-name" />
+                                <col className="col-qty" />
+                                <col className="col-totalw" />
+                                <col className="col-tarew" />
+                                <col className="col-net" />
+                                <col className="col-price" />
+                                <col className="col-sub" />
+                            </colgroup>
+                            <thead>
+                                <tr className="bg-gray-100">
+                                    <th className="border-2 border-black p-2 text-center">序次</th>
+                                    <th className="border-2 border-black p-2 text-left">品項名稱</th>
+                                    <th className="border-2 border-black p-2 text-center">數量/籠</th>
+                                    <th className="border-2 border-black p-2 text-center">總重/斤</th>
+                                    <th className="border-2 border-black p-2 text-center">空重/斤</th>
+                                    <th className="border-2 border-black p-2 text-center text-brand">淨重/斤</th>
+                                    <th className="border-2 border-black p-2 text-center">單價/元</th>
+                                    {/* 二.(3) 小計改為「合計/元」，置中 */}
+                                    <th className="border-2 border-black p-2 text-center font-black">合計/元</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {items.map((item, idx) => (
+                                    <tr key={item.id}>
+                                        <td className="border border-black p-2 text-center font-bold">{idx + 1}</td>
+                                        <td className="border border-black p-2 text-left">
+                                            <div className="font-black text-base">{item.name || '---'}</div>
+                                            {item.note && <div className="text-xs text-gray-500 italic mt-1 font-sans">※ {item.note}</div>}
+                                        </td>
+                                        <td className="border border-black p-2 text-center font-bold">{item.qty || '—'}</td>
+                                        <td className="border border-black p-2 text-center font-bold">{item.totalW || '—'}</td>
+                                        <td className="border border-black p-2 text-center font-bold">{item.tareW || '—'}</td>
+                                        <td className="border border-black p-2 text-center font-black text-base text-brand">{getNetW(item)}</td>
+                                        <td className="border border-black p-2 text-center font-black text-base">{item.price || '—'}</td>
+                                        <td className="border border-black p-2 text-center font-black text-base">${getAmount(item).toLocaleString()}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
 
-                    {/* 二-7：合計金額改中文，移除綠底色，改粗框線，字體黑色 */}
-                    <div className="flex justify-end mb-10">
-                        <div className="total-box">
-                            <span className="text-sm font-black block mb-1 font-sans text-black">合計金額（元）</span>
-                            <span className="text-4xl font-black tracking-tighter text-black">${calculateTotal().toLocaleString()}</span>
+                        {/* ── 二.(4) 總計金額（粗框、無底色、黑色字、文字加大） ── */}
+                        <div className="flex justify-end mb-6">
+                            <div className="total-box">
+                                <span className="text-base font-black block mb-1 font-sans text-black tracking-wider">總計金額 / 元</span>
+                                <span className="text-5xl font-black tracking-tighter text-black">${calculateTotal().toLocaleString()}</span>
+                            </div>
+                        </div>
+
+                        {/* ── 備註 / 條款 ── */}
+                        <div className="border-2 border-black p-4 text-sm min-h-[72px] mb-4">
+                            <p className="font-black mb-2 underline italic">備註 / 條款：</p>
+                            <div className="whitespace-pre-wrap leading-relaxed font-sans">{headerInfo.footerNote}</div>
+                        </div>
+
+                        {/* ── 一.3：帳務狀態（報價單顯示，框與備註相同樣式，內容區隔） ── */}
+                        <div className="border-2 border-black mb-6 overflow-hidden" style={{display:'flex'}}>
+                            {/* 左側直書「帳務狀態」 */}
+                            <div className="account-sidebar bg-gray-100" style={{minWidth:'32px'}}>
+                                帳務狀態
+                            </div>
+                            {/* 右側選項 */}
+                            <div className="flex flex-col justify-center gap-3 px-5 py-4 flex-1">
+                                {/* 款項已結清 */}
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xl font-black leading-none"
+                                        style={{color: acctSettled ? '#16a34a' : '#333'}}>
+                                        {acctSettled ? '☑' : '☐'}
+                                    </span>
+                                    <span className={`text-base font-black ${acctSettled ? 'text-green-700' : 'text-gray-400'}`}>款項已結清</span>
+                                </div>
+                                {/* 分隔線 */}
+                                <hr className="border-gray-300" />
+                                {/* 款項未結清 */}
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xl font-black leading-none"
+                                        style={{color: !acctSettled ? '#ea580c' : '#333'}}>
+                                        {!acctSettled ? '☑' : '☐'}
+                                    </span>
+                                    <span className={`text-base font-black ${!acctSettled ? 'text-orange-600' : 'text-gray-400'}`}>款項未結清</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── 二.(5) 簽名欄：往下移，空間加大 ── */}
+                        <div className="flex justify-between mt-20 px-8">
+                            <div className="w-2/5 border-t-2 border-black pt-3 text-center text-sm font-black">客戶簽認</div>
+                            <div className="w-2/5 border-t-2 border-black pt-3 text-center text-sm font-black">{headerInfo.companyName} 簽章</div>
                         </div>
                     </div>
-
-                    {/* 備註 / 條款 */}
-                    <div className="border-2 border-black p-4 text-sm min-h-[80px] mb-8">
-                        <p className="font-black mb-2 underline italic">備註 / 條款：</p>
-                        <div className="whitespace-pre-wrap leading-relaxed font-sans">{headerInfo.footerNote}</div>
-                    </div>
-
-                    {/* 簽名欄 */}
-                    <div className="flex justify-between mt-14 px-10">
-                        <div className="w-1/3 border-t-2 border-black pt-2 text-center text-sm font-black">客戶簽章</div>
-                        <div className="w-1/3 border-t-2 border-black pt-2 text-center text-sm font-black">{headerInfo.companyName} 簽章</div>
-                    </div>
                 </div>
-            </div>
-        );
+            );
+        };
 
         return mode === 'edit' ? renderEdit() : renderPreview();
     };
